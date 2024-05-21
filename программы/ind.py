@@ -6,172 +6,208 @@
 # данных, используя соответстсвующую переменную окружения.
 # Вариант 15
 
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+# Для своего варианта лабораторной работы 2.17 добавьте возможность получения
+# имени файла данных, используя соответствующую переменную окружения.
+
+import argparse
 import json
 import os
-import sys
-from jsonschema import validate, ValidationError
+from datetime import datetime
+import jsonschema
 
-def get_zodiac():
-    """
-    Запросить данные о списке
-    """
-    start = input("Ведите фамилию, имя ")
-    finish = input("Введите знак Зодиака ")
-    zodiac = (input("Введите дату рождения "))
-
-    return {
-        'start': start,
-        'finish': finish,
-        'zodiac': zodiac,
-    }
+person_schema = {
+    "type": "object",
+    "properties": {
+        "name": {"type": "string"},
+        "surname": {"type": "string"},
+        "date_of_birth": {"type": "string", "format": "date"},
+        "zodiac_sign": {"type": "string"}
+    },
+    "required": ["name", "surname", "date_of_birth", "zodiac_sign"]
+}
 
 
-def display_zodiac(zodiacs):
-    """
-    Отобразить список
-    """
-    if zodiacs:
-        line = '+-{}-+-{}-+-{}-+-{}-+'.format(
-            '-' * 4,
-            '-' * 30,
-            '-' * 20,
-            '-' * 14
-        )
-        print(line)
-        print(
-            '| {:^4} | {:^30} | {:^20} | {:^14} |'.format(
-                "№",
-                "Фамилия, имя",
-                "Знак Зодиака",
-                "Дата рождения"
-            )
-        )
-        print(line)
-
-        for idx, worker in enumerate(zodiacs, 1):
-            print(
-                '| {:>4} | {:<30} | {:<20} | {:>14} |'.format(
-                    idx,
-                    worker.get('start', ''),
-                    worker.get('finish', ''),
-                    worker.get('zodiac', '')
-                )
-            )
-        print(line)
-    else:
-        print("Список пуст")
-
-
-def select_zodiacs(zodiacs, period):
-    """
-    Выбрать зодиак
-    """
-    result = []
-    for employee in zodiacs:
-        if employee.get('finish') == period:
-            result.append(employee)
-
-    return result
-
-
-def save_zodiacs(file_name, staff):
-    """
-    Сохранить данные в файл JSON
-    """
-    with open(file_name, "w", encoding="utf-8") as fout:
-        json.dump(staff, fout, ensure_ascii=False, indent=4)
-
-
-def load_zodiacs(file_name=None):
-    """
-    Загрузить данные из файла JSON
-    """
-    if file_name is None:
-        file_name = os.environ.get('data_individ.json')  # Get file name from environment variable
-
-    if file_name is None:
-        print("Файл не указан. Укажите имя файла или установите переменную окружения ZODIAC_FILE.", file=sys.stderr)
-        return []
-
-    schema = {
-        "type": "array",
-        "items": {
-            "type": "object",
-            "properties": {
-                "start": {"type": "string"},
-                "finish": {"type": "string"},
-                "zodiac": {"type": "string"},
-            },
-            "required": [
-                "start",
-                "finish",
-                "zodiac",
-            ],
-        },
-    }
-    # Открыть файл с заданным именем и прочитать его содержимое.
-    with open(file_name, "r") as file_in:
-        data = json.load(file_in)  # Прочитать данные из файла
-
+def validate_person(person_data, schema):
     try:
-        # Валидация
-        validate(instance=data, schema=schema)
-        print("JSON валиден по схеме.")
-    except ValidationError as e:
-        print(f"Ошибка валидации: {e.message}")
+        jsonschema.validate(person_data, schema)
+        return True
+    except jsonschema.exceptions.ValidationError as e:
+        print(f"Данные человека не соответствуют схеме: {e}")
+        return False
 
-    return data  # Вернуть загруженные и проверенные данные
+
+def add_person(people, name, surname, date_of_birth, zodiac_sign):
+    """
+    Добавление нового человека в список.
+    Список сортируется по знаку зодиака после добавления нового элемента.
+    """
+    date_of_birth = datetime.strptime(date_of_birth, '%d.%m.%Y')
+
+    person = {
+        'name': name,
+        'surname': surname,
+        'date_of_birth': date_of_birth,
+        'zodiac_sign': zodiac_sign
+    }
+
+    people.append(person)
+    people.sort(key=lambda item: item.get('zodiac_sign', ''))
+    return people
+
+
+def list_people(people):
+    """
+    Вывод таблицы людей.
+    """
+    line = '+-{}-+-{}-+-{}-+-{}-+-{}-+'.format(
+        '-' * 4,
+        '-' * 20,
+        '-' * 20,
+        '-' * 15,
+        '-' * 13
+    )
+    print(line)
+    print(
+        '| {:^4} | {:^20} | {:^20} | {:^15} | {:^12} |'.format(
+            "№",
+            "Имя",
+            "Фамилия",
+            "Знак Зодиака",
+            "Дата рождения"
+        )
+    )
+    print(line)
+
+    for idx, person in enumerate(people, 1):
+        birth_date_str = person.get('date_of_birth').strftime('%d.%m.%Y')
+        print(
+            '| {:^4} | {:<20} | {:<20} | {:<15} | {:<13} |'.format(
+                idx,
+                person.get('name', ''),
+                person.get('surname', ''),
+                person.get('zodiac_sign', ''),
+                birth_date_str
+            )
+        )
+
+    print(line)
+
+
+def select_people(people, month):
+    """
+    Вывести список людей, родившихся в заданном месяце.
+    """
+    count = 0
+    for person in people:
+        if person.get('date_of_birth').month == month:
+            count += 1
+            print('{:>4}: {} {}'.format(count, person.get(
+                'name', ''), person.get('surname', '')))
+
+    if count == 0:
+        print("Люди, родившиеся в указанном месяце, не найдены.")
+
+
+def save_people(file_name, staff):
+    """
+    Сохранить всех работников в файл JSON.
+    """
+    staff_formatted = [{**person, 'date_of_birth': person.get(
+        'date_of_birth').strftime('%d.%m.%Y')} for person in staff]
+    # Открыть файл с заданным именем для записи.
+    with open(file_name, "w", encoding="utf-8") as fout:
+        # Выполнить сериализацию данных в формат JSON.
+        json.dump(staff_formatted, fout, ensure_ascii=False, indent=4)
+
+
+def load_people(file_name):
+    """
+    Загрузить всех людей из файла JSON.
+    """
+    # Открыть файл с заданным именем для чтения.
+    with open(file_name, "r", encoding="utf-8") as fin:
+        staff_loaded = json.load(fin)
+        result_people = []
+        cnt = 0
+        for person in staff_loaded:
+            cnt += 1
+            if validate_person(person, person_schema):
+                try:
+                    person['date_of_birth'] = datetime.strptime(
+                        person['date_of_birth'], '%d.%m.%Y')
+                    result_people.append(person)
+                except:
+                    print(
+                        f"Ошибка при разборе даты в записи, пропуск записи {cnt}.")
+            else:
+                print("Неверные данные человека, пропуск записи.")
+        return result_people
 
 
 def main():
-    """
-    Главная функция программы
-    """
-    zodiacs = []
+    file_parser = argparse.ArgumentParser(add_help=False)
+    file_parser.add_argument(
+        "-f", "--filename",
+        default=os.environ.get("DATA_ANALYSIS", "default.json"),
+        help="The data file name (default: %(default)s)"
+    )
+    # Создание основного парсера.
+    parser = argparse.ArgumentParser(description="Управление списком людей")
+    subparsers = parser.add_subparsers(dest="command")
 
-    while True:
-        command = input(">>> ").lower()
-        if command == 'exit':
-            break
+    # Создание парсера для добавления человека.
+    parser_add = subparsers.add_parser(
+        'add', parents=[file_parser], help="Добавить человека")
+    parser_add.add_argument("-n", "--name", help="Имя человека",
+                            required=True)
+    parser_add.add_argument("-s", "--surname", help="Фамилия человека",
+                            required=True)
+    parser_add.add_argument(
+        "-d", "--date_of_birth", help="Дата рождения (формат ДД.ММ.ГГГГ)",
+        required=True)
+    parser_add.add_argument("-z", "--zodiac_sign", help="Знак зодиака",
+                            required=True)
 
-        elif command == 'add':
-            zodiac = get_zodiac()
-            zodiacs.append(zodiac)
-            zodiacs.sort(key=lambda item: int(item.get('zodiac', '').split('.')[2]))
+    # Создание парсера для вывода списка людей.
+    _ = subparsers.add_parser(
+        'list', parents=[file_parser], help="Вывести список людей")
 
-        elif command == 'list':
-            display_zodiac(zodiacs)
+    # Создание парсера для выбора человека по месяцу рождения.
+    parser_select = subparsers.add_parser(
+        'select', parents=[file_parser], help="Выбрать людей по месяцу рождения")
+    parser_select.add_argument(
+        "-m", "--month", type=int, help="Месяц рождения",
+        required=True)
 
-        elif command.startswith('select'):
-            parts = command.split(' ', maxsplit=1)
-            period = parts[1].strip()  # Получаем название знака Зодиака
-            selected = select_zodiacs(zodiacs, period)
-            if selected:
-                display_zodiac(selected)
-            else:
-                print("Нет людей с таким знаком Зодиака.")
+    # Разбираем аргументы командной строки.
+    args = parser.parse_args()
 
-        elif command.startswith("save "):
-            parts = command.split(maxsplit=1)
-            file_name = parts[1]
-            save_zodiacs(file_name, zodiacs)
+    is_dirty = False
 
-        elif command.startswith("load "):
-            parts = command.split(maxsplit=1)
-            file_name = parts[1]
-            zodiacs = load_zodiacs(file_name)
+    filename = os.path.join("data", args.filename)
 
-        elif command == 'help':
-            print("Список команд:\n")
-            print("add - добавить знак зодиака;")
-            print("list - вывести список;")
-            print("select <список знаков зодиака> - запросить данные о зодиаке;")
-            print("help - отобразить справку;")
-            print("load - загрузить данные из файла;")
-            print("save - сохранить данные в файл;")
-            print("exit - завершить работу с программой.")
-        else:
-            print(f"Неизвестная команда {command}", file=sys.stderr)
+    if os.path.exists(filename):
+        people = load_people(filename)
+    else:
+        people = []
+
+    # Определяем, какую команду нужно выполнить.
+    if args.command == 'add':
+        people = add_person(people, args.name, args.surname,
+                            args.date_of_birth, args.zodiac_sign)
+        is_dirty = True
+
+    elif args.command == 'list':
+        list_people(people)
+
+    elif args.command == 'select':
+        select_people(people, args.month)
+
+    if is_dirty:
+        save_people(filename, people)
 
 
 if __name__ == '__main__':
